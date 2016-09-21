@@ -1,28 +1,23 @@
 #include <iostream>
-#include <cstdio>
+#include <cstdio> // TODO: remove
 #include <cassert>
 #include <map>
 #include <thread>
 #include <mutex>
 #include <deque>
 #include <SFML/Network.hpp>
+#include <getopt.h>
 
-#define DEBUG
-
-#ifdef DEBUG
-	#define DEBUG_PRINT printf // there has to be a better way
-	#define TICK_TIME 1
-#else
-	#define DEBUG_PRINT
-	#define TICK_TIME 0.02f
-#endif
+float interval = 0.02;
+int print_commands = 0;
+int print_packet_loss = 0;
 
 enum Direction : sf::Uint8 {
-	none, up, down, left, right	
+	none, up, down, left, right
 };
 
 enum Command_Type : sf::Uint8 {
-	null, player_join, player_leave, player_damage, message
+	null, player_join, player_leave, player_damage
 };
 
 std::mutex mutex;
@@ -46,14 +41,12 @@ class Join_Command : public Command {
 			this->player_id = player_id;
 			this->x = x;
 			this->y = y;
-		
-			DEBUG_PRINT("new join command (id: %i)\n", id);
+
+			if(print_commands) printf("new join command (id: %i)\n", id);
 		}
 
 		sf::Packet& send(sf::Packet& packet) {
-			DEBUG_PRINT("sending join command (id: %i)\n", id);
-
-			assert(packet << Command_Type::player_join << this->id << this->player_id << this->x << this->y); 
+			assert(packet << (sf::Uint8) Command_Type::player_join << (sf::Uint16) this->id << (sf::Uint16) this->player_id << (sf::Uint16) this->x << (sf::Uint16)this->y); 
 			return packet;
 		}
 };
@@ -66,13 +59,11 @@ class Leave_Command : public Command {
 			this->id = id;
 			this->player_id = player_id;
 
-			DEBUG_PRINT("new leave command (id: %i)\n", id);
+			if(print_commands) printf("new leave command (id: %i)\n", id);
 		}
-		
-		sf::Packet& send(sf::Packet& packet) {
-			DEBUG_PRINT("sending leave command (id: %i)\n", id);
 
-			assert(packet << Command_Type::player_leave << this->id << this->player_id); 
+		sf::Packet& send(sf::Packet& packet) {
+			assert(packet << (sf::Uint8) Command_Type::player_leave << (sf::Uint16) this->id << (sf::Uint16) this->player_id); 
 			return packet;
 		}
 };
@@ -106,8 +97,6 @@ void receive() {
 		assert(socket.receive(packet, sender, port) == sf::Socket::Done);
 		assert(packet >> last_received_command >> action);
 
-		DEBUG_PRINT("recieved packet (last_received_command: %i, action %i)\n", last_received_command, action);
-	
 		mutex.lock();
 
 		std::pair<sf::IpAddress, int> key(sender, port);
@@ -119,7 +108,7 @@ void receive() {
 			clients.insert(
 				std::pair<std::pair<sf::IpAddress, int>, Client>(key, client)
 			);
-			
+
 			std::cout << "new client " << sender <<  " " << port << " " << client.id << std::endl;
 
 			new_clients.push_back(&clients[key]);
@@ -127,12 +116,11 @@ void receive() {
 			Client &client = clients[key];
 
 			if (client.last_packet == 0) { // got multiple packets during the same tick
-				std::cerr << "Ignoring packet" << std::endl;
+				if(print_packet_loss) std::cerr << "Ignoring packet" << std::endl;
 			}
 
 			while(client.command_queue.size() &&
 				client.command_queue.front()->id <= last_received_command) {
-				DEBUG_PRINT("deleting command (id: %i)\n", client.command_queue.front()->id);
 				delete client.command_queue.front();
 				client.command_queue.pop_front();
 			}
@@ -140,7 +128,7 @@ void receive() {
 			client.last_packet = 0;
 			client.action = action;
 		}
-		
+
 		mutex.unlock();
 	}
 }
@@ -210,16 +198,15 @@ void gameloop() {
 					);
 				}
 			}
-		
+
 			for (auto &command : client.second.command_queue) {
-				DEBUG_PRINT("seinding command (id: %i)\n", command->id);
 				packet << *command;
 			}
-			
-			packet << Command_Type::null;
+
+			packet << (sf::Uint8) Command_Type::null;
 
 			for (auto &client2 : clients) {
-				packet << client2.second.id << client2.second.x << client2.second.y;
+				packet << (sf::Uint16) client2.second.id << (sf::Uint16) client2.second.x << (sf::Uint16) client2.second.y;
 			}
 
 			assert(socket.send(packet, client.first.first, client.first.second) == sf::Socket::Done);
@@ -229,7 +216,7 @@ void gameloop() {
 
 		for (auto &client : clients) {
 			if (client.second.last_packet >= 1) {
-				std::cerr << "Packet lost" << std::endl;
+				if(print_packet_loss) std::cerr << "Packet lost" << std::endl;
 			}
 
 			if (client.second.last_packet > 5) {
@@ -248,12 +235,42 @@ void gameloop() {
 		}
 
 		mutex.unlock();
-		sf::sleep(sf::seconds(TICK_TIME) - clock.restart());
+		sf::sleep(sf::seconds(interval) - clock.restart());
 	}
 }
 
-int main() {
-	std::cout << "Starting mmorpg-server v0.0.1 by Motivationsbanner (c) 2016" << std::endl;
+int main(int argc, char **argv) {
+	struct option options[] = {
+		{"interval", required_argument, 0, 'i'},
+		{"print-commands", no_argument, &print_commands, 1},
+		{"print-packet-loss", no_argument, &print_packet_loss, 1},
+		{0, 0, 0, 0}
+	};
+
+	int option_index = 0;
+	int c = 0;
+
+	while(c != -1) {
+		c = getopt_long(argc, argv, "i:", options, &option_index);
+		switch(c) {
+			case 'i':
+				interval = atof(optarg);
+				break;
+
+			case '?':
+				return -1;
+		}
+	}
+
+	// Invalid value or 0
+	if(interval == 0) {
+		interval = 0.02f;
+	}
+
+	std::cout << "Starting Server" << std::endl;
+	std::cout << "Interval: " << interval << std::endl;
+	std::cout << "Print command creation: " << (print_commands ? "true" : "false") << std::endl;
+	std::cout << "Print packet loss: " << (print_packet_loss ? "true" : "false") << std::endl;
 
 	assert(socket.bind(4499) == sf::Socket::Done);
 
