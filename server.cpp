@@ -89,7 +89,7 @@ std::deque<sf::Uint16> disconnected_clients;
 void receive() {
 	sf::Packet packet;
 	sf::IpAddress sender;
-	unsigned short port;
+	unsigned short port; // port of the client
 	sf::Uint8 action;
 	sf::Uint16 last_received_command;
 
@@ -242,12 +242,14 @@ void gameloop() {
 int main(int argc, char **argv) {
 	struct option options[] = {
 		{"interval", required_argument, 0, 'i'},
+		{"port", required_argument, 0, 'p'},
 		{"print-commands", no_argument, &print_commands, 1},
 		{"print-packet-loss", no_argument, &print_packet_loss, 1},
 		{0, 0, 0, 0}
 	};
 
 	int option_index = 0;
+	int port = 4499;
 	int c = 0;
 
 	while(c != -1) {
@@ -255,6 +257,10 @@ int main(int argc, char **argv) {
 		switch(c) {
 			case 'i':
 				interval = atof(optarg);
+				break;
+
+			case 'p':
+				port = atoi(optarg);
 				break;
 
 			case '?':
@@ -267,12 +273,12 @@ int main(int argc, char **argv) {
 		interval = 0.02f;
 	}
 
-	std::cout << "Starting Server" << std::endl;
+	std::cout << "Starting Server localhost:" << port << std::endl;
 	std::cout << "Interval: " << interval << std::endl;
 	std::cout << "Print command creation: " << (print_commands ? "true" : "false") << std::endl;
 	std::cout << "Print packet loss: " << (print_packet_loss ? "true" : "false") << std::endl;
 
-	assert(socket.bind(4499) == sf::Socket::Done);
+	assert(socket.bind(port) == sf::Socket::Done);
 
 	std::thread recieve_thread(receive);
 	std::thread gameloop_thread(gameloop);
