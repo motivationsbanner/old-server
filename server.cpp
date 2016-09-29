@@ -8,7 +8,7 @@
 #include <SFML/Network.hpp>
 #include <getopt.h>
 
-float interval = 0.02;
+float interval = 0.05;
 int print_commands = 0;
 int print_packet_loss = 0;
 
@@ -149,14 +149,16 @@ void gameloop() {
 				// No commands have been sent yet
 				// Send player_join commands
 				for (auto &client2 : clients) {
-					client.second.command_queue.push_back(
-						new Join_Command(
-							++ client.second.last_sent_command,
-							client2.second.id,
-							client2.second.x,
-							client2.second.y
-						)
-					);
+					if (client2.second.id != client.second.id) {
+						client.second.command_queue.push_back(
+							new Join_Command(
+								++ client.second.last_sent_command,
+								client2.second.id,
+								client2.second.x,
+								client2.second.y
+							)
+						);
+					}
 				}
 			} else {
 				for (auto &client2 : new_clients) {
@@ -186,8 +188,12 @@ void gameloop() {
 
 			packet << (sf::Uint8) Command_Type::null;
 
+			packet << (sf::Uint16) 0 << (sf::Uint16) client.second.x << (sf::Uint16) client.second.y;
+
 			for (auto &client2 : clients) {
-				packet << (sf::Uint16) client2.second.id << (sf::Uint16) client2.second.x << (sf::Uint16) client2.second.y;
+				if (client2.second.id != client.second.id) {
+					packet << (sf::Uint16) client2.second.id << (sf::Uint16) client2.second.x << (sf::Uint16) client2.second.y;
+				}
 			}
 
 			assert(socket.send(packet, client.first.first, client.first.second) == sf::Socket::Done);
@@ -251,7 +257,7 @@ int main(int argc, char **argv) {
 
 	// Invalid value or 0
 	if(interval == 0) {
-		interval = 0.02f;
+		interval = 0.05f;
 	}
 
 	std::cout << "Starting Server localhost:" << port << std::endl;
