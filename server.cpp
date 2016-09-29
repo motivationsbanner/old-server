@@ -73,7 +73,6 @@ sf::Packet& operator <<(sf::Packet& packet, Command& command) {
 }
 
 struct Client {
-	sf::Uint8 action;
 	int last_packet = 0; // the amount of ticks ago the last packet has been received
 	std::deque<Command *> command_queue;
 	sf::Uint16 id = ++newest_id;
@@ -90,12 +89,11 @@ void receive() {
 	sf::Packet packet;
 	sf::IpAddress sender;
 	unsigned short port; // port of the client
-	sf::Uint8 action;
-	sf::Uint16 last_received_command;
+	sf::Uint16 last_received_command, x, y;
 
 	while (true) {
 		assert(socket.receive(packet, sender, port) == sf::Socket::Done);
-		assert(packet >> last_received_command >> action);
+		assert(packet >> last_received_command >> x >> y);
 
 		mutex.lock();
 
@@ -103,13 +101,15 @@ void receive() {
 
 		if (clients.find(key) == clients.end()) {
 			Client client;
-			client.action = action;
 
 			clients.insert(
 				std::pair<std::pair<sf::IpAddress, int>, Client>(key, client)
 			);
 
 			std::cout << "new client " << sender <<  " " << port << " " << client.id << std::endl;
+			
+			client.x = x;
+			client.y = y;
 
 			new_clients.push_back(&clients[key]);
 		} else {
@@ -126,7 +126,8 @@ void receive() {
 			}
 
 			client.last_packet = 0;
-			client.action = action;
+			client.x = x;
+			client.y = y;
 		}
 
 		mutex.unlock();
@@ -140,26 +141,6 @@ void gameloop() {
 	while (true) {
 		clock.restart();
 		mutex.lock();
-
-		for (auto &client : clients) {
-			switch (client.second.action) {
-				case Direction::up:
-					client.second.y --;
-					break;
-
-				case Direction::down:
-					client.second.y ++;
-					break;
-
-				case Direction::left:
-					client.second.x --;
-					break;
-
-				case Direction::right:
-					client.second.x ++;
-					break;
-			}
-		}
 
 		for (auto &client : clients) {
 			packet.clear();
