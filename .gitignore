@@ -1,3 +1,4 @@
 hidden
 server
 logs/
+*.un~
