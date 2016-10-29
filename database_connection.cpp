@@ -27,11 +27,12 @@ bool DatabaseConnection::test_user(std::string name, std::string password) {
 		stmt = con->createStatement();
 		res = stmt->executeQuery("SELECT COALESCE(SHA2('"+ password +"', 256) = (SELECT password FROM players WHERE name = '"+ name +"'), 0) 'match'");
 		res->next();
-		return res->getBoolean("match");
-		
+		bool match = res->getBoolean("match");
+
 		delete res;
 		delete stmt;
 
+		return match;
 	} catch (sql::SQLException &e) {
 		// TODO: log
 		return 0;
