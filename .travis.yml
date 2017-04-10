@@ -1,0 +1,6 @@
+language: cpp
+before_install:
+- sudo apt-get update -qq
+- sudo apt-get install -qq libsfml-dev libmysqlcppconn-dev
+compiler: gcc
+script: make

@@ -1,4 +1,7 @@
-all: server.cpp
-	clear # clear consle to only view the new compiler messages
-	printf '\033[3J' # clear putty buffer
-	g++ *.cpp -lsfml-network -lsfml-system -o server -std=c++14 -pthread -ggdb -lmysqlcppconn
+all: server
+
+server: command.cpp command.h database_connection.cpp database_connection.h server.cpp
+	$(CXX) *.cpp -lsfml-network -lsfml-system -o server -std=c++11 -pthread -ggdb -lmysqlcppconn
+
+clean:
+	rm server

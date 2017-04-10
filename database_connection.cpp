@@ -5,8 +5,8 @@
 #include <cppconn/resultset.h>
 #include <cppconn/statement.h>
 
-#include "hidden/password.h"
 #include "database_connection.h"
+#define MYSQL_PASSWORD "kek"
 
 DatabaseConnection::DatabaseConnection() {
 	driver = get_driver_instance();
